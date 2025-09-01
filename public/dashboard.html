@@ -136,7 +136,6 @@
         transform: translateY(-1px);
       }
 
-      /* Custom Scrollbars */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -161,13 +160,11 @@
         background: #1a1a1a;
       }
 
-      /* Firefox scrollbars */
       * {
         scrollbar-width: thin;
         scrollbar-color: #404040 #1a1a1a;
       }
 
-      /* Touch-friendly interactions */
       @media (hover: none) and (pointer: coarse) {
         .song-item:hover {
           transform: none;
@@ -290,7 +287,6 @@
         font-size: 1.2rem;
       }
 
-      /* Icon styles using CSS */
       .icon-play::before {
         content: "";
         width: 0;
@@ -770,7 +766,6 @@
         color: #e22134;
       }
 
-      /* Mobile Filters Dropdown */
       .mobile-filters-toggle {
         display: none;
         background: #1db954;
@@ -848,12 +843,10 @@
           padding: 0.5rem;
         }
 
-        /* Hide desktop filters */
         .filters-section {
           display: none;
         }
 
-        /* Show mobile filters */
         .mobile-filters-toggle {
           display: block;
         }
@@ -903,7 +896,6 @@
           padding: 0.1rem 0.3rem;
         }
 
-        /* Fixed bottom player */
         .player-controls {
           position: fixed;
           bottom: 0;
@@ -941,7 +933,7 @@
         }
 
         .volume-control {
-          display: none; /* Hide on mobile */
+          display: none;
         }
 
         .control-btn {
@@ -1002,7 +994,6 @@
           font-size: 10px;
         }
 
-        /* Thinner scrollbars on mobile */
         ::-webkit-scrollbar {
           width: 4px;
           height: 4px;
@@ -1454,7 +1445,6 @@
       }
 
       async function loadLikedSongs() {
-        // Fast initial load without genres
         showStatus("Loading your songs...", "success");
         const response = await fetch("/api/liked-songs?fastLoad=true");
         if (!response.ok) {
@@ -1469,7 +1459,6 @@
           "success"
         );
 
-        // Load genres in background
         loadGenresInBackground();
       }
 
@@ -1490,7 +1479,6 @@
             "tracks"
           );
 
-          // Update tracks with genres
           let updatedCount = 0;
           likedSongs.forEach((item) => {
             if (item.track && trackGenres[item.track.uri]) {
@@ -1500,7 +1488,6 @@
           });
           console.log("Updated", updatedCount, "tracks with genres");
 
-          // Update UI with genres
           collectGenres();
           setupFilters();
           applyFilters();
@@ -1509,7 +1496,6 @@
             "success"
           );
 
-          // Hide status after 3 seconds
           setTimeout(() => {
             const statusEl = document.getElementById("status-message");
             if (statusEl) statusEl.style.display = "none";
@@ -1537,7 +1523,6 @@
 
         const sortedGenres = Array.from(allGenres).sort();
 
-        // Setup desktop genres
         sortedGenres.forEach((genre) => {
           const option = document.createElement("div");
           option.className = "genre-option";
@@ -1548,7 +1533,6 @@
           genreList.appendChild(option);
         });
 
-        // Setup mobile genres
         sortedGenres.forEach((genre) => {
           const option = document.createElement("div");
           option.className = "genre-option";
@@ -1593,7 +1577,6 @@
             clearAllFilters();
           });
 
-        // Mobile filters setup
         document
           .getElementById("mobile-title-filter")
           .addEventListener("input", (e) => {
@@ -1646,7 +1629,6 @@
           });
         }
 
-        // Desktop selection buttons
         const selectAllDesktop = document.getElementById(
           "select-all-btn-desktop"
         );
@@ -1661,7 +1643,6 @@
           clearSelectionDesktop.addEventListener("click", clearSelection);
         }
 
-        // Mobile selection buttons
         const selectAllMobile = document.getElementById(
           "select-all-btn-mobile"
         );
@@ -1761,14 +1742,12 @@
       }
 
       function syncFilterValues() {
-        // Sync desktop filters
         const titleFilter = document.getElementById("title-filter");
         if (titleFilter) titleFilter.value = currentFilters.title;
 
         const artistFilter = document.getElementById("artist-filter");
         if (artistFilter) artistFilter.value = currentFilters.artist;
 
-        // Sync mobile filters
         const mobileTitleFilter = document.getElementById(
           "mobile-title-filter"
         );
@@ -1780,14 +1759,12 @@
         if (mobileArtistFilter)
           mobileArtistFilter.value = currentFilters.artist;
 
-        // Sync genre checkboxes
         const allGenres = Array.from(document.querySelectorAll("[data-genre]"));
         allGenres.forEach((checkbox) => {
           const genre = checkbox.getAttribute("data-genre");
           checkbox.checked = currentFilters.genres.has(genre);
         });
 
-        // Sync "all genres" checkboxes
         const allGenresDesktop = document.getElementById("all-genres");
         const allGenresMobile = document.getElementById("mobile-all-genres");
         const isAllGenres = currentFilters.genres.size === 0;
@@ -1992,7 +1969,6 @@
           return;
         }
 
-        // Sort playlists by track count (descending)
         const sortedPlaylists = [...playlists].sort((a, b) => {
           return (b.tracks?.total || 0) - (a.tracks?.total || 0);
         });
@@ -2050,14 +2026,12 @@
         selectionCount.textContent = `${count} selected`;
       }
 
-      // Disconnect player when user navigates away or closes tab
       window.addEventListener("beforeunload", () => {
         if (player) {
           player.disconnect();
         }
       });
 
-      // Player control functions
       async function playTrack(trackUri) {
         if (!player || !deviceId) {
           showStatus(
@@ -2176,7 +2150,6 @@
       }
 
       function updatePlayingIcons() {
-        // Update all song cover images and play overlays
         document.querySelectorAll(".song-cover").forEach((img) => {
           const playOverlay = img.parentElement.querySelector(".play-icon");
           const trackUri = img.getAttribute("onclick").match(/'([^']+)'/)[1];
@@ -2198,17 +2171,14 @@
       }
 
       function selectPlaylistById(playlistId) {
-        // Remove active class from all playlist items
         document
           .querySelectorAll(".playlist-item")
           .forEach((item) => item.classList.remove("active"));
 
-        // Add active class to the clicked playlist item
         document
           .querySelector(`[data-playlist-id="${playlistId}"]`)
           .classList.add("active");
 
-        // Find the playlist object by ID
         selectedPlaylist = playlists.find((p) => p.id === playlistId);
         updateActionButtons();
       }
@@ -2290,7 +2260,6 @@
             throw new Error("Failed to remove from liked songs");
           }
 
-          // Remove from local array and update display
           const selectedIndices = Array.from(selectedSongs).sort(
             (a, b) => b - a
           );
@@ -2324,7 +2293,6 @@
         }, 3000);
       }
 
-      // Event listeners
       document
         .getElementById("add-to-playlist-btn")
         .addEventListener("click", addToPlaylist);
@@ -2332,7 +2300,6 @@
         .getElementById("remove-from-liked-btn")
         .addEventListener("click", removeFromLiked);
 
-      // Initialize the app
       init();
     </script>
   </body>

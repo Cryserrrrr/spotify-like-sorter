@@ -8,19 +8,16 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 app.use(express.static("public"));
 app.use(cookieParser());
 
-// Spotify API configuration
 const spotifyApi = new SpotifyWebApi({
   clientId: process.env.SPOTIFY_CLIENT_ID,
   clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
   redirectUri: process.env.REDIRECT_URI,
 });
 
-// Generate random string for state parameter
 const generateRandomString = (length) => {
   let text = "";
   const possible =
@@ -31,7 +28,6 @@ const generateRandomString = (length) => {
   return text;
 };
 
-// Routes
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/public/index.html");
 });
@@ -102,7 +98,6 @@ app.get("/dashboard", (req, res) => {
   res.sendFile(__dirname + "/public/dashboard.html");
 });
 
-// API Routes
 app.get("/api/token", (req, res) => {
   const accessToken = req.cookies.access_token;
   if (!accessToken) {
@@ -130,7 +125,6 @@ app.get("/api/liked-songs", async (req, res) => {
     let allTracks = [];
     let hasMore = true;
 
-    // Option to skip genres to avoid rate limiting
     const skipGenres = req.query.skipGenres === "true";
     const fastLoad = req.query.fastLoad === "true";
 
@@ -141,14 +135,12 @@ app.get("/api/liked-songs", async (req, res) => {
       offset += limit;
     }
 
-    // Initialize all tracks with empty genres for fast initial load
     allTracks.forEach((item) => {
       if (item.track) {
         item.track.genres = [];
       }
     });
 
-    // If fast load requested, return immediately without genres
     if (fastLoad) {
       res.json(allTracks);
       return;
@@ -212,7 +204,6 @@ app.get("/api/liked-songs", async (req, res) => {
   }
 });
 
-// New endpoint for loading genres separately
 app.get("/api/liked-songs-genres", async (req, res) => {
   try {
     spotifyApi.setAccessToken(req.cookies.access_token);
@@ -297,15 +288,12 @@ app.get("/api/playlists", async (req, res) => {
   try {
     spotifyApi.setAccessToken(req.cookies.access_token);
 
-    // Get current user info
     const userInfo = await spotifyApi.getMe();
     const currentUserId = userInfo.body.id;
 
     const data = await spotifyApi.getUserPlaylists();
 
-    // Filter playlists to only include those where user can add tracks
     const editablePlaylists = data.body.items.filter((playlist) => {
-      // User owns the playlist OR playlist is collaborative
       return (
         playlist.owner.id === currentUserId || playlist.collaborative === true
       );
@@ -322,10 +310,8 @@ app.post("/api/add-to-playlist", async (req, res) => {
     const { playlistId, trackUris } = req.body;
     spotifyApi.setAccessToken(req.cookies.access_token);
 
-    // Support both single track and multiple tracks
     const uris = Array.isArray(trackUris) ? trackUris : [trackUris];
 
-    // Spotify API allows max 100 tracks per request
     const batchSize = 100;
     for (let i = 0; i < uris.length; i += batchSize) {
       const batch = uris.slice(i, i + batchSize);
@@ -343,10 +329,8 @@ app.post("/api/remove-from-liked", async (req, res) => {
     const { trackIds } = req.body;
     spotifyApi.setAccessToken(req.cookies.access_token);
 
-    // Support both single track and multiple tracks
     const ids = Array.isArray(trackIds) ? trackIds : [trackIds];
 
-    // Spotify API allows max 50 tracks per request for removing
     const batchSize = 50;
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
@@ -367,7 +351,6 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
-// HTTPS server setup
 const options = {
   key: fs.readFileSync("127.0.0.1-key.pem"),
   cert: fs.readFileSync("127.0.0.1.pem"),

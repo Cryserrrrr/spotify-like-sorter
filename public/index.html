@@ -182,7 +182,6 @@
     </div>
 
     <script>
-      // Check for error in URL hash
       const hash = window.location.hash;
       if (hash.includes("error=")) {
         const errorDiv = document.getElementById("error");
@@ -198,7 +197,6 @@
         errorDiv.textContent = errorMessage;
         errorDiv.style.display = "block";
 
-        // Clear the hash
         window.location.hash = "";
       }
     </script>
