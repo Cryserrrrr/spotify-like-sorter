@@ -73,13 +73,13 @@ app.get("/callback", async (req, res) => {
 
     res.cookie("access_token", access_token, {
       httpOnly: false,
-      secure: true,
+      secure: !isProduction, // Only secure in development (HTTPS)
       sameSite: "strict",
       maxAge: 3600000, // 1 hour
     });
     res.cookie("refresh_token", refresh_token, {
       httpOnly: true,
-      secure: true,
+      secure: !isProduction, // Only secure in development (HTTPS)
       sameSite: "strict",
       maxAge: 86400000, // 24 hours
     });
@@ -351,9 +351,26 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
-const options = {
-  key: fs.readFileSync("127.0.0.1-key.pem"),
-  cert: fs.readFileSync("127.0.0.1.pem"),
-};
+const isProduction = process.env.NODE_ENV === "production";
 
-https.createServer(options, app).listen(PORT, "127.0.0.1", () => {});
+if (isProduction) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+} else {
+  try {
+    const options = {
+      key: fs.readFileSync("127.0.0.1-key.pem"),
+      cert: fs.readFileSync("127.0.0.1.pem"),
+    };
+
+    https.createServer(options, app).listen(PORT, "127.0.0.1", () => {
+      console.log(`HTTPS Server running on https://127.0.0.1:${PORT}`);
+    });
+  } catch (error) {
+    console.log("SSL certificates not found, falling back to HTTP");
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`HTTP Server running on port ${PORT}`);
+    });
+  }
+}
