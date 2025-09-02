@@ -224,23 +224,6 @@
         cursor: pointer;
       }
 
-      .song-genres {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.3rem;
-        margin-top: 0.3rem;
-      }
-
-      .genre-tag {
-        background: rgba(29, 185, 84, 0.2);
-        color: #1db954;
-        padding: 0.2rem 0.5rem;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        font-weight: 500;
-        border: 1px solid rgba(29, 185, 84, 0.3);
-      }
-
       .song-cover {
         width: 50px;
         height: 50px;
@@ -556,67 +539,6 @@
         box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
       }
 
-      .genre-filter-container {
-        position: relative;
-      }
-
-      .genre-toggle {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        text-align: left;
-      }
-
-      .dropdown-arrow {
-        font-size: 0.8rem;
-        transition: transform 0.2s;
-      }
-
-      .genre-toggle.open .dropdown-arrow {
-        transform: rotate(180deg);
-      }
-
-      .genre-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: #282828;
-        border: 1px solid #404040;
-        border-radius: 5px;
-        max-height: 200px;
-        overflow-y: auto;
-        z-index: 1000;
-        margin-top: 2px;
-      }
-
-      .genre-option {
-        padding: 0.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-
-      .genre-option:hover {
-        background: #404040;
-      }
-
-      .genre-option input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-      }
-
-      .genre-option label {
-        flex: 1;
-        cursor: pointer;
-        font-size: 0.9rem;
-        color: white;
-      }
-
       .selection-controls {
         padding: 1rem 0;
         border-bottom: 1px solid #404040;
@@ -891,11 +813,6 @@
           line-height: 1.2;
         }
 
-        .genre-tag {
-          font-size: 0.6rem;
-          padding: 0.1rem 0.3rem;
-        }
-
         .player-controls {
           position: fixed;
           bottom: 0;
@@ -972,10 +889,6 @@
         .playlist-cover {
           width: 30px;
           height: 30px;
-        }
-
-        .genre-dropdown {
-          max-height: 120px;
         }
 
         .song-checkbox {
@@ -1101,28 +1014,6 @@
             />
           </div>
           <div class="filter-group">
-            <div class="genre-filter-container">
-              <button
-                id="mobile-genre-filter-toggle"
-                class="filter-select genre-toggle"
-              >
-                <span id="mobile-genre-filter-text">All genres</span>
-                <span class="dropdown-arrow">▼</span>
-              </button>
-              <div
-                id="mobile-genre-dropdown"
-                class="genre-dropdown"
-                style="display: none"
-              >
-                <div class="genre-option">
-                  <input type="checkbox" id="mobile-all-genres" checked />
-                  <label for="mobile-all-genres">All genres</label>
-                </div>
-                <div id="mobile-genre-list"></div>
-              </div>
-            </div>
-          </div>
-          <div class="filter-group">
             <div class="filter-buttons">
               <button id="select-all-btn-mobile" class="btn btn-small">
                 Select All
@@ -1153,28 +1044,6 @@
               class="filter-input"
               placeholder="Filter by artist..."
             />
-          </div>
-          <div class="filter-group">
-            <div class="genre-filter-container">
-              <button
-                id="genre-filter-toggle"
-                class="filter-select genre-toggle"
-              >
-                <span id="genre-filter-text">All genres</span>
-                <span class="dropdown-arrow">▼</span>
-              </button>
-              <div
-                id="genre-dropdown"
-                class="genre-dropdown"
-                style="display: none"
-              >
-                <div class="genre-option">
-                  <input type="checkbox" id="all-genres" checked />
-                  <label for="all-genres">All genres</label>
-                </div>
-                <div id="genre-list"></div>
-              </div>
-            </div>
           </div>
           <div class="filter-group">
             <div class="filter-buttons">
@@ -1266,12 +1135,10 @@
       let currentTrackUri = null;
       let isPlaying = false;
       let accessToken = null;
-      let allGenres = new Set();
       let filteredSongs = [];
       let currentFilters = {
         title: "",
         artist: "",
-        genres: new Set(),
       };
 
       async function init() {
@@ -1446,103 +1313,17 @@
 
       async function loadLikedSongs() {
         showStatus("Loading your songs...", "success");
-        const response = await fetch("/api/liked-songs?fastLoad=true");
+        const response = await fetch("/api/liked-songs");
         if (!response.ok) {
           throw new Error("Failed to load liked songs");
         }
         likedSongs = await response.json();
-        collectGenres();
         setupFilters();
         applyFilters();
-        showStatus(
-          `Loaded ${likedSongs.length} songs. Loading genres...`,
-          "success"
-        );
-
-        loadGenresInBackground();
-      }
-
-      async function loadGenresInBackground() {
-        try {
-          console.log("Starting genre loading...");
-          const response = await fetch("/api/liked-songs-genres");
-          if (!response.ok) {
-            console.log("Genre API response not ok:", response.status);
-            showStatus("Songs loaded. Genres unavailable.", "success");
-            return;
-          }
-
-          const trackGenres = await response.json();
-          console.log(
-            "Received genres for",
-            Object.keys(trackGenres).length,
-            "tracks"
-          );
-
-          let updatedCount = 0;
-          likedSongs.forEach((item) => {
-            if (item.track && trackGenres[item.track.uri]) {
-              item.track.genres = trackGenres[item.track.uri];
-              updatedCount++;
-            }
-          });
-          console.log("Updated", updatedCount, "tracks with genres");
-
-          collectGenres();
-          setupFilters();
-          applyFilters();
-          showStatus(
-            `Loaded ${likedSongs.length} songs with genres!`,
-            "success"
-          );
-
-          setTimeout(() => {
-            const statusEl = document.getElementById("status-message");
-            if (statusEl) statusEl.style.display = "none";
-          }, 3000);
-        } catch (error) {
-          console.log("Error loading genres:", error);
-          showStatus("Songs loaded. Could not load genres.", "success");
-        }
-      }
-
-      function collectGenres() {
-        allGenres.clear();
-        likedSongs.forEach((item) => {
-          if (item.track && item.track.genres) {
-            item.track.genres.forEach((genre) => allGenres.add(genre));
-          }
-        });
+        showStatus(`Loaded ${likedSongs.length} songs!`, "success");
       }
 
       function setupFilters() {
-        const genreList = document.getElementById("genre-list");
-        const mobileGenreList = document.getElementById("mobile-genre-list");
-        genreList.innerHTML = "";
-        mobileGenreList.innerHTML = "";
-
-        const sortedGenres = Array.from(allGenres).sort();
-
-        sortedGenres.forEach((genre) => {
-          const option = document.createElement("div");
-          option.className = "genre-option";
-          option.innerHTML = `
-            <input type="checkbox" id="genre-${genre}" data-genre="${genre}">
-            <label for="genre-${genre}">${genre}</label>
-          `;
-          genreList.appendChild(option);
-        });
-
-        sortedGenres.forEach((genre) => {
-          const option = document.createElement("div");
-          option.className = "genre-option";
-          option.innerHTML = `
-            <input type="checkbox" id="mobile-genre-${genre}" data-genre="${genre}">
-            <label for="mobile-genre-${genre}">${genre}</label>
-          `;
-          mobileGenreList.appendChild(option);
-        });
-
         document
           .getElementById("title-filter")
           .addEventListener("input", (e) => {
@@ -1556,20 +1337,6 @@
             currentFilters.artist = e.target.value.toLowerCase();
             applyFilters();
           });
-
-        document
-          .getElementById("genre-filter-toggle")
-          .addEventListener("click", toggleGenreDropdown);
-
-        document
-          .getElementById("all-genres")
-          .addEventListener("change", handleAllGenresChange);
-
-        sortedGenres.forEach((genre) => {
-          document
-            .getElementById(`genre-${genre}`)
-            .addEventListener("change", () => handleGenreChange(genre));
-        });
 
         document
           .getElementById("clear-filters-btn")
@@ -1592,33 +1359,6 @@
             syncFilterValues();
             applyFilters();
           });
-
-        const mobileGenreToggle = document.getElementById(
-          "mobile-genre-filter-toggle"
-        );
-        if (mobileGenreToggle) {
-          mobileGenreToggle.addEventListener("click", () =>
-            toggleMobileGenreDropdown()
-          );
-        }
-
-        const mobileAllGenres = document.getElementById("mobile-all-genres");
-        if (mobileAllGenres) {
-          mobileAllGenres.addEventListener("change", () =>
-            handleMobileAllGenresChange()
-          );
-        }
-
-        sortedGenres.forEach((genre) => {
-          const mobileGenreCheckbox = document.getElementById(
-            `mobile-genre-${genre}`
-          );
-          if (mobileGenreCheckbox) {
-            mobileGenreCheckbox.addEventListener("change", () =>
-              handleMobileGenreChange(genre)
-            );
-          }
-        });
 
         const mobileClearFilters = document.getElementById(
           "mobile-clear-filters-btn"
@@ -1656,89 +1396,11 @@
         if (clearSelectionMobile) {
           clearSelectionMobile.addEventListener("click", clearSelection);
         }
-
-        document.addEventListener("click", (e) => {
-          if (!e.target.closest(".genre-filter-container")) {
-            closeGenreDropdown();
-            closeMobileGenreDropdown();
-          }
-        });
       }
 
       function toggleMobileFilters() {
         const dropdown = document.getElementById("mobile-filters");
         dropdown.classList.toggle("open");
-      }
-
-      function toggleMobileGenreDropdown() {
-        const dropdown = document.getElementById("mobile-genre-dropdown");
-        const toggle = document.getElementById("mobile-genre-filter-toggle");
-
-        if (dropdown.style.display === "none") {
-          dropdown.style.display = "block";
-          toggle.classList.add("open");
-        } else {
-          closeMobileGenreDropdown();
-        }
-      }
-
-      function closeMobileGenreDropdown() {
-        const dropdown = document.getElementById("mobile-genre-dropdown");
-        const toggle = document.getElementById("mobile-genre-filter-toggle");
-        dropdown.style.display = "none";
-        toggle.classList.remove("open");
-      }
-
-      function handleMobileAllGenresChange() {
-        const allGenresCheckbox = document.getElementById("mobile-all-genres");
-        const genreCheckboxes = document.querySelectorAll(
-          '[id^="mobile-genre-"][data-genre]'
-        );
-
-        if (allGenresCheckbox.checked) {
-          currentFilters.genres.clear();
-          genreCheckboxes.forEach((checkbox) => (checkbox.checked = false));
-        }
-
-        syncFilterValues();
-        updateGenreFilterText();
-        updateMobileGenreFilterText();
-        applyFilters();
-      }
-
-      function handleMobileGenreChange(genre) {
-        const genreCheckbox = document.getElementById(`mobile-genre-${genre}`);
-        const allGenresCheckbox = document.getElementById("mobile-all-genres");
-
-        if (genreCheckbox.checked) {
-          currentFilters.genres.add(genre);
-          allGenresCheckbox.checked = false;
-        } else {
-          currentFilters.genres.delete(genre);
-          if (currentFilters.genres.size === 0) {
-            allGenresCheckbox.checked = true;
-          }
-        }
-
-        syncFilterValues();
-        updateGenreFilterText();
-        updateMobileGenreFilterText();
-        applyFilters();
-      }
-
-      function updateMobileGenreFilterText() {
-        const filterText = document.getElementById("mobile-genre-filter-text");
-        if (!filterText) return;
-
-        const selectedCount = currentFilters.genres.size;
-
-        if (selectedCount === 0) {
-          filterText.textContent = "All genres";
-        } else if (selectedCount === 1) {
-          filterText.textContent = Array.from(currentFilters.genres)[0];
-        } else {
-          filterText.textContent = `${selectedCount} genres selected`;
-        }
       }
 
       function syncFilterValues() {
@@ -1758,98 +1420,12 @@
         );
         if (mobileArtistFilter)
           mobileArtistFilter.value = currentFilters.artist;
-
-        const allGenres = Array.from(document.querySelectorAll("[data-genre]"));
-        allGenres.forEach((checkbox) => {
-          const genre = checkbox.getAttribute("data-genre");
-          checkbox.checked = currentFilters.genres.has(genre);
-        });
-
-        const allGenresDesktop = document.getElementById("all-genres");
-        const allGenresMobile = document.getElementById("mobile-all-genres");
-        const isAllGenres = currentFilters.genres.size === 0;
-
-        if (allGenresDesktop) allGenresDesktop.checked = isAllGenres;
-        if (allGenresMobile) allGenresMobile.checked = isAllGenres;
       }
 
       function clearAllFilters() {
-        currentFilters = { title: "", artist: "", genres: new Set() };
+        currentFilters = { title: "", artist: "" };
         syncFilterValues();
-        updateGenreFilterText();
-        updateMobileGenreFilterText();
         applyFilters();
-      }
-
-      function toggleGenreDropdown() {
-        const dropdown = document.getElementById("genre-dropdown");
-        const toggle = document.getElementById("genre-filter-toggle");
-
-        if (dropdown.style.display === "none") {
-          dropdown.style.display = "block";
-          toggle.classList.add("open");
-        } else {
-          closeGenreDropdown();
-        }
-      }
-
-      function closeGenreDropdown() {
-        const dropdown = document.getElementById("genre-dropdown");
-        const toggle = document.getElementById("genre-filter-toggle");
-        dropdown.style.display = "none";
-        toggle.classList.remove("open");
-      }
-
-      function handleAllGenresChange() {
-        const allGenresCheckbox = document.getElementById("all-genres");
-        const genreCheckboxes = document.querySelectorAll(
-          '[id^="genre-"][data-genre]'
-        );
-
-        if (allGenresCheckbox.checked) {
-          currentFilters.genres.clear();
-          genreCheckboxes.forEach((checkbox) => (checkbox.checked = false));
-        }
-
-        syncFilterValues();
-        updateGenreFilterText();
-        updateMobileGenreFilterText();
-        applyFilters();
-      }
-
-      function handleGenreChange(genre) {
-        const genreCheckbox = document.getElementById(`genre-${genre}`);
-        const allGenresCheckbox = document.getElementById("all-genres");
-
-        if (genreCheckbox.checked) {
-          currentFilters.genres.add(genre);
-          allGenresCheckbox.checked = false;
-        } else {
-          currentFilters.genres.delete(genre);
-          if (currentFilters.genres.size === 0) {
-            allGenresCheckbox.checked = true;
-          }
-        }
-
-        syncFilterValues();
-        updateGenreFilterText();
-        updateMobileGenreFilterText();
-        applyFilters();
-      }
-
-      function updateGenreFilterText() {
-        const filterText = document.getElementById("genre-filter-text");
-        if (!filterText) return;
-
-        const selectedCount = currentFilters.genres.size;
-
-        if (selectedCount === 0) {
-          filterText.textContent = "All genres";
-        } else if (selectedCount === 1) {
-          filterText.textContent = Array.from(currentFilters.genres)[0];
-        } else {
-          filterText.textContent = `${selectedCount} genres selected`;
-        }
       }
 
       function applyFilters() {
@@ -1867,12 +1443,7 @@
               artist.name.toLowerCase().includes(currentFilters.artist)
             );
 
-          const genreMatch =
-            currentFilters.genres.size === 0 ||
-            (track.genres &&
-              track.genres.some((genre) => currentFilters.genres.has(genre)));
-
-          return titleMatch && artistMatch && genreMatch;
+          return titleMatch && artistMatch;
         });
 
         displayFilteredSongs();
@@ -1907,12 +1478,6 @@
             const track = item.track;
             const coverUrl =
               track.album.images[2]?.url || track.album.images[0]?.url || "";
-
-            const genres = track.genres || [];
-            const genreTags = genres
-              .slice(0, 3)
-              .map((genre) => `<span class="genre-tag">${genre}</span>`)
-              .join("");
 
             const originalIndex = likedSongs.indexOf(item);
             const isSelected = selectedSongs.has(originalIndex);
@@ -1950,7 +1515,6 @@
                               <div class="song-artist">${track.artists
                                 .map((a) => a.name)
                                 .join(", ")}</div>
-                              <div class="song-genres">${genreTags}</div>
                           </div>
                       </div>
                   `;

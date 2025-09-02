@@ -7,6 +7,7 @@ require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === "production";
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -38,6 +39,7 @@ app.get("/login", (req, res) => {
 
   const scopes = [
     "user-library-read",
+    "user-library-modify",
     "playlist-read-private",
     "playlist-modify-public",
     "playlist-modify-private",
@@ -73,15 +75,15 @@ app.get("/callback", async (req, res) => {
 
     res.cookie("access_token", access_token, {
       httpOnly: false,
-      secure: !isProduction, // Only secure in development (HTTPS)
+      secure: isProduction,
       sameSite: "strict",
-      maxAge: 3600000, // 1 hour
+      maxAge: 3600000,
     });
     res.cookie("refresh_token", refresh_token, {
       httpOnly: true,
-      secure: !isProduction, // Only secure in development (HTTPS)
+      secure: isProduction,
       sameSite: "strict",
-      maxAge: 86400000, // 24 hours
+      maxAge: 86400000,
     });
 
     res.redirect("/dashboard");
@@ -125,162 +127,16 @@ app.get("/api/liked-songs", async (req, res) => {
     let allTracks = [];
     let hasMore = true;
 
-    const skipGenres = req.query.skipGenres === "true";
-    const fastLoad = req.query.fastLoad === "true";
-
     while (hasMore) {
       const data = await spotifyApi.getMySavedTracks({ limit, offset });
       allTracks = allTracks.concat(data.body.items);
       hasMore = data.body.items.length === limit;
       offset += limit;
-    }
-
-    allTracks.forEach((item) => {
-      if (item.track) {
-        item.track.genres = [];
-      }
-    });
-
-    if (fastLoad) {
-      res.json(allTracks);
-      return;
-    }
-
-    if (!skipGenres) {
-      const batchSize = 10;
-      let processedCount = 0;
-
-      for (let i = 0; i < allTracks.length; i += batchSize) {
-        const batch = allTracks.slice(i, i + batchSize);
-
-        for (let item of batch) {
-          try {
-            if (
-              item.track &&
-              item.track.artists &&
-              item.track.artists.length > 0
-            ) {
-              const artistIds = item.track.artists
-                .slice(0, 2)
-                .map((artist) => artist.id);
-              await new Promise((resolve) => setTimeout(resolve, 50));
-
-              const artistsData = await spotifyApi.getArtists(artistIds);
-
-              const genres = new Set();
-              artistsData.body.artists.forEach((artist) => {
-                if (artist.genres) {
-                  artist.genres.forEach((genre) => genres.add(genre));
-                }
-              });
-
-              item.track.genres = Array.from(genres);
-              processedCount++;
-            }
-          } catch (artistError) {
-            if (artistError.statusCode === 429) {
-              for (let j = i; j < allTracks.length; j++) {
-                allTracks[j].track.genres = [];
-              }
-              break;
-            } else {
-              item.track.genres = [];
-            }
-          }
-        }
-
-        if (processedCount < i + batch.length) {
-          break;
-        }
-        if (i + batchSize < allTracks.length) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        }
-      }
     }
 
     res.json(allTracks);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch liked songs" });
-  }
-});
-
-app.get("/api/liked-songs-genres", async (req, res) => {
-  try {
-    spotifyApi.setAccessToken(req.cookies.access_token);
-    const limit = 50;
-    let offset = 0;
-    let allTracks = [];
-    let hasMore = true;
-
-    console.log("Starting to fetch liked songs for genres...");
-    while (hasMore) {
-      const data = await spotifyApi.getMySavedTracks({ limit, offset });
-      allTracks = allTracks.concat(data.body.items);
-      hasMore = data.body.items.length === limit;
-      offset += limit;
-    }
-    console.log(`Fetched ${allTracks.length} tracks for genre processing`);
-
-    const trackGenres = {};
-    const batchSize = 5;
-    let processedCount = 0;
-
-    for (let i = 0; i < allTracks.length; i += batchSize) {
-      const batch = allTracks.slice(i, i + batchSize);
-
-      for (let item of batch) {
-        try {
-          if (
-            item.track &&
-            item.track.artists &&
-            item.track.artists.length > 0
-          ) {
-            const artistIds = item.track.artists
-              .slice(0, 2)
-              .map((artist) => artist.id);
-            await new Promise((resolve) => setTimeout(resolve, 200));
-
-            const artistsData = await spotifyApi.getArtists(artistIds);
-
-            const genres = new Set();
-            artistsData.body.artists.forEach((artist) => {
-              if (artist.genres) {
-                artist.genres.forEach((genre) => genres.add(genre));
-              }
-            });
-
-            trackGenres[item.track.uri] = Array.from(genres);
-            processedCount++;
-          }
-        } catch (artistError) {
-          console.log(
-            "Error fetching artist data:",
-            artistError.statusCode || artistError.message
-          );
-          if (artistError.statusCode === 429) {
-            console.log("Rate limit hit, stopping genre fetching");
-            break;
-          } else {
-            trackGenres[item.track.uri] = [];
-          }
-        }
-      }
-
-      if (processedCount < i + batch.length) {
-        break;
-      }
-      if (i + batchSize < allTracks.length) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-    }
-
-    console.log(
-      `Processed genres for ${Object.keys(trackGenres).length} tracks`
-    );
-    res.json(trackGenres);
-  } catch (error) {
-    console.log("Error in genres endpoint:", error);
-    res.status(500).json({ error: "Failed to fetch genres" });
   }
 });
 
@@ -308,6 +164,17 @@ app.get("/api/playlists", async (req, res) => {
 app.post("/api/add-to-playlist", async (req, res) => {
   try {
     const { playlistId, trackUris } = req.body;
+
+    if (
+      !playlistId ||
+      !trackUris ||
+      (Array.isArray(trackUris) && trackUris.length === 0)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Missing playlist ID or track URIs" });
+    }
+
     spotifyApi.setAccessToken(req.cookies.access_token);
 
     const uris = Array.isArray(trackUris) ? trackUris : [trackUris];
@@ -315,18 +182,59 @@ app.post("/api/add-to-playlist", async (req, res) => {
     const batchSize = 100;
     for (let i = 0; i < uris.length; i += batchSize) {
       const batch = uris.slice(i, i + batchSize);
-      await spotifyApi.addTracksToPlaylist(playlistId, batch);
+      try {
+        await spotifyApi.addTracksToPlaylist(playlistId, batch);
+      } catch (batchError) {
+        console.log(
+          "Error adding batch:",
+          batchError?.statusCode || batchError?.message
+        );
+        if (batchError?.statusCode === 401) {
+          return res
+            .status(401)
+            .json({ error: "Unauthorized - please login again" });
+        }
+        if (batchError?.statusCode === 403) {
+          return res.status(403).json({
+            error:
+              "Forbidden - insufficient permissions. Please login again to refresh permissions.",
+          });
+        }
+        throw batchError;
+      }
     }
 
     res.json({ success: true, addedCount: uris.length });
   } catch (error) {
-    res.status(500).json({ error: "Failed to add track(s) to playlist" });
+    console.log(
+      "Error in add-to-playlist:",
+      error?.statusCode || error?.message
+    );
+
+    if (error?.statusCode === 401) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (error?.statusCode === 403) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden - insufficient permissions" });
+    }
+
+    res.status(500).json({
+      error: "Failed to add track(s) to playlist",
+      details: error?.message || "Unknown error",
+    });
   }
 });
 
 app.post("/api/remove-from-liked", async (req, res) => {
   try {
     const { trackIds } = req.body;
+
+    if (!trackIds || (Array.isArray(trackIds) && trackIds.length === 0)) {
+      return res.status(400).json({ error: "No track IDs provided" });
+    }
+
     spotifyApi.setAccessToken(req.cookies.access_token);
 
     const ids = Array.isArray(trackIds) ? trackIds : [trackIds];
@@ -334,14 +242,48 @@ app.post("/api/remove-from-liked", async (req, res) => {
     const batchSize = 50;
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
-      await spotifyApi.removeFromMySavedTracks(batch);
+      try {
+        await spotifyApi.removeFromMySavedTracks(batch);
+      } catch (batchError) {
+        console.log(
+          "Error removing batch:",
+          batchError?.statusCode || batchError?.message
+        );
+        if (batchError?.statusCode === 401) {
+          return res
+            .status(401)
+            .json({ error: "Unauthorized - please login again" });
+        }
+        if (batchError?.statusCode === 403) {
+          return res.status(403).json({
+            error:
+              "Forbidden - insufficient permissions. Please login again to refresh permissions.",
+          });
+        }
+        throw batchError;
+      }
     }
 
     res.json({ success: true, removedCount: ids.length });
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Failed to remove track(s) from liked songs" });
+    console.log(
+      "Error in remove-from-liked:",
+      error?.statusCode || error?.message
+    );
+
+    if (error?.statusCode === 401) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (error?.statusCode === 403) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden - insufficient permissions" });
+    }
+
+    res.status(500).json({
+      error: "Failed to remove track(s) from liked songs",
+      details: error?.message || "Unknown error",
+    });
   }
 });
 
@@ -350,8 +292,6 @@ app.get("/logout", (req, res) => {
   res.clearCookie("refresh_token");
   res.redirect("/");
 });
-
-const isProduction = process.env.NODE_ENV === "production";
 
 if (isProduction) {
   app.listen(PORT, "0.0.0.0", () => {
