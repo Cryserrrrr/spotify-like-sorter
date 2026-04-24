@@ -6,160 +6,119 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>Dashboard - Spotify Like Sorter</title>
+    <title>Spotify Sorter</title>
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <link rel="stylesheet" href="dashboard.css" />
   </head>
   <body>
-    <div class="header">
-      <h1>Spotify Like Sorter</h1>
-      <div class="header-info">
-        <div class="user-info">
-          <span id="username">Loading...</span>
+    <header class="header">
+      <div class="logo">Spotify Sorter</div>
+      <div class="progress-info">
+        <span id="progress-text">Loading...</span>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
         </div>
+      </div>
+      <div class="header-right">
+        <span id="username" class="username"></span>
         <a href="/logout" class="logout-btn">Logout</a>
       </div>
-    </div>
+    </header>
 
-    <div class="main-content">
-      <div class="songs-section">
-        <div class="section-header">
-          <h2 class="section-title">Liked Songs</h2>
-          <span id="songs-counter" class="counter">0</span>
-        </div>
-
-        <!-- Mobile Filters -->
-        <button class="mobile-filters-toggle" onclick="toggleMobileFilters()">
-          🔍 Filters & Search
-        </button>
-        <div class="mobile-filters-dropdown" id="mobile-filters">
-          <div class="filter-group">
-            <input
-              type="text"
-              id="mobile-title-filter"
-              class="filter-input"
-              placeholder="Filter by title..."
-            />
-          </div>
-          <div class="filter-group">
-            <input
-              type="text"
-              id="mobile-artist-filter"
-              class="filter-input"
-              placeholder="Filter by artist..."
-            />
-          </div>
-          <div class="filter-group">
-            <div class="filter-buttons">
-              <button id="select-all-btn-mobile" class="btn btn-small">
-                Select All
-              </button>
-              <button id="clear-selection-btn-mobile" class="btn btn-small">
-                Clear
-              </button>
-              <button id="mobile-clear-filters-btn" class="btn btn-small">
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="filters-section">
-          <div class="filter-group">
-            <input
-              type="text"
-              id="title-filter"
-              class="filter-input"
-              placeholder="Filter by title..."
-            />
-          </div>
-          <div class="filter-group">
-            <input
-              type="text"
-              id="artist-filter"
-              class="filter-input"
-              placeholder="Filter by artist..."
-            />
-          </div>
-          <div class="filter-group">
-            <div class="filter-buttons">
-              <button id="select-all-btn-desktop" class="btn btn-small">
-                Select All
-              </button>
-              <button id="clear-selection-btn-desktop" class="btn btn-small">
-                Clear
-              </button>
-              <button id="clear-filters-btn" class="btn btn-small">
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        </div>
-        <div id="songs-list" class="songs-list">
-          <div class="loading">Loading your liked songs...</div>
-        </div>
+    <main class="triage-container">
+      <!-- Loading -->
+      <div id="loading-screen" class="loading-screen">
+        <div class="spinner"></div>
+        <p>Loading your liked songs...</p>
       </div>
 
-      <div class="playlists-section">
-        <div class="player-controls" id="player-controls" style="display: none">
-          <div class="player-info">
-            <div class="current-track" id="current-track">No track playing</div>
-            <div class="current-artist" id="current-artist">
-              Select a song to play
+      <!-- Empty -->
+      <div id="empty-screen" class="empty-screen" style="display: none">
+        <div class="empty-icon">&#10003;</div>
+        <h2>All sorted!</h2>
+        <p>No more liked songs to sort.</p>
+      </div>
+
+      <!-- Triage -->
+      <div id="triage-view" class="triage-view" style="display: none">
+        <!-- Track + Player -->
+        <div class="track-section">
+          <div class="track-card" id="track-card">
+            <img id="album-art" class="album-art" src="" alt="Album cover" />
+            <div class="track-meta">
+              <h2 class="track-name" id="track-name"></h2>
+              <p class="track-artist" id="track-artist"></p>
+            </div>
+            <div class="player-section">
+              <div class="seek-row">
+                <span class="time" id="time-current">0:00</span>
+                <input type="range" class="seek-bar" id="seek-bar" min="0" max="100" value="0" />
+                <span class="time" id="time-total">0:00</span>
+              </div>
+              <div class="player-buttons">
+                <button class="btn-play" id="btn-play" onclick="togglePlayback()">
+                  <i class="icon-play" id="play-icon"></i>
+                </button>
+                <div class="volume-control">
+                  <img src="volume-speaker-svgrepo-com.svg" alt="Volume" class="volume-icon" />
+                  <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="50" />
+                </div>
+              </div>
             </div>
           </div>
-          <div class="play-controls">
-            <button
-              class="control-btn"
-              id="play-pause-btn"
-              onclick="togglePlayback()"
-            >
-              <i class="icon-play"></i>
-            </button>
+        </div>
+
+        <!-- Playlists -->
+        <div class="playlists-section">
+          <div class="playlists-header">
+            <p class="section-label">Add to playlists:</p>
+            <button class="btn-organize" id="btn-organize" onclick="openOrganize()">Organize</button>
           </div>
-          <div class="volume-control">
-            <img
-              src="volume-speaker-svgrepo-com.svg"
-              alt="Volume"
-              class="volume-icon"
-            />
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value="50"
-              class="volume-slider"
-              id="volume-slider"
-              onchange="setVolume(this.value)"
-            />
+          <div class="playlist-groups" id="playlist-groups"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+          <button class="btn-action btn-skip" id="btn-skip" onclick="skip()">Skip</button>
+          <button class="btn-action btn-next" id="btn-next" onclick="next()">Next</button>
+          <button class="btn-action btn-undo" id="btn-undo" onclick="undo()" disabled>Undo</button>
+        </div>
+      </div>
+    </main>
+
+    <div class="shortcuts-bar">
+      <span><kbd>1</kbd>-<kbd>0</kbd> <kbd>a</kbd>-<kbd>z</kbd> playlists</span>
+      <span><kbd>Space</kbd> play/pause</span>
+      <span><kbd>Enter</kbd> next</span>
+      <span><kbd>S</kbd> skip</span>
+      <span><kbd>Z</kbd> undo</span>
+    </div>
+
+    <!-- Organize modal -->
+    <div class="modal-overlay" id="organize-modal" style="display: none">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Organize playlists</h2>
+          <button class="modal-close" onclick="closeOrganize()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-add-group">
+            <input type="text" id="new-group-name" placeholder="New group name..." class="input-group-name" />
+            <button class="btn-add-group" onclick="addGroup()">+ Add</button>
+          </div>
+          <div class="modal-groups" id="modal-groups"></div>
+          <div class="modal-ungrouped">
+            <h3 class="modal-section-title">Ungrouped playlists</h3>
+            <div id="modal-ungrouped-list" class="modal-playlist-list"></div>
           </div>
         </div>
-
-        <div class="section-header">
-          <h2 class="section-title">Your Playlists</h2>
+        <div class="modal-footer">
+          <button class="btn-action btn-next" onclick="closeOrganize()">Done</button>
         </div>
-        <div id="playlists-list" class="songs-list">
-          <div class="loading">Loading playlists...</div>
-        </div>
-
-        <div class="selection-controls">
-          <div class="selection-info">
-            <span id="selection-count">0 selected</span>
-          </div>
-        </div>
-
-        <div class="action-buttons">
-          <button id="add-to-playlist-btn" class="btn btn-primary" disabled>
-            Add to Playlist
-          </button>
-          <button id="remove-from-liked-btn" class="btn btn-secondary" disabled>
-            Remove from Liked
-          </button>
-        </div>
-
-        <div id="status-message" class="status-message"></div>
       </div>
     </div>
+
+    <div class="toast" id="toast"></div>
 
     <script src="dashboard.js"></script>
   </body>

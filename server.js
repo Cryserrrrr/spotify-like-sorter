@@ -93,7 +93,7 @@ app.get("/callback", async (req, res) => {
 });
 
 app.get("/dashboard", (req, res) => {
-  if (!req.cookies.access_token) {
+  if (!req.cookies.access_token && !req.cookies.refresh_token) {
     res.redirect("/");
     return;
   }
@@ -107,6 +107,31 @@ app.get("/api/token", (req, res) => {
     return;
   }
   res.json({ access_token: accessToken });
+});
+
+app.post("/api/refresh", async (req, res) => {
+  const refreshToken = req.cookies.refresh_token;
+  if (!refreshToken) {
+    return res.status(401).json({ error: "No refresh token" });
+  }
+  try {
+    spotifyApi.setRefreshToken(refreshToken);
+    const data = await spotifyApi.refreshAccessToken();
+    const newAccessToken = data.body.access_token;
+    spotifyApi.setAccessToken(newAccessToken);
+    res.cookie("access_token", newAccessToken, {
+      httpOnly: false,
+      secure: isProduction,
+      sameSite: "strict",
+      maxAge: 3600000,
+    });
+    res.json({ access_token: newAccessToken });
+  } catch (error) {
+    console.log("Refresh failed:", error?.statusCode || error?.message);
+    res.clearCookie("access_token");
+    res.clearCookie("refresh_token");
+    res.status(401).json({ error: "Refresh failed" });
+  }
 });
 
 app.get("/api/user", async (req, res) => {
@@ -147,9 +172,20 @@ app.get("/api/playlists", async (req, res) => {
     const userInfo = await spotifyApi.getMe();
     const currentUserId = userInfo.body.id;
 
-    const data = await spotifyApi.getUserPlaylists();
+    const limit = 50;
+    let offset = 0;
+    let allPlaylists = [];
+    let hasMore = true;
 
-    const editablePlaylists = data.body.items.filter((playlist) => {
+    while (hasMore) {
+      const data = await spotifyApi.getUserPlaylists({ limit, offset });
+      allPlaylists = allPlaylists.concat(data.body.items);
+      hasMore = data.body.items.length === limit;
+      offset += limit;
+    }
+
+    const editablePlaylists = allPlaylists.filter((playlist) => {
+      if (!playlist || !playlist.owner) return false;
       return (
         playlist.owner.id === currentUserId || playlist.collaborative === true
       );
@@ -224,6 +260,59 @@ app.post("/api/add-to-playlist", async (req, res) => {
       error: "Failed to add track(s) to playlist",
       details: error?.message || "Unknown error",
     });
+  }
+});
+
+app.get("/api/audio-analysis/:id", async (req, res) => {
+  try {
+    spotifyApi.setAccessToken(req.cookies.access_token);
+    const data = await spotifyApi.getAudioAnalysisForTrack(req.params.id);
+    const sections = data.body.sections || [];
+    if (sections.length === 0) {
+      return res.json({ startMs: null });
+    }
+    // Find the loudest section (chorus/drop)
+    let best = sections[0];
+    for (const s of sections) {
+      if (s.loudness > best.loudness) {
+        best = s;
+      }
+    }
+    res.json({ startMs: Math.floor(best.start * 1000) });
+  } catch (error) {
+    // Audio Analysis may be deprecated — return null so frontend uses fallback
+    res.json({ startMs: null });
+  }
+});
+
+app.post("/api/add-to-liked", async (req, res) => {
+  try {
+    const { trackIds } = req.body;
+    if (!trackIds) {
+      return res.status(400).json({ error: "No track IDs provided" });
+    }
+    spotifyApi.setAccessToken(req.cookies.access_token);
+    const ids = Array.isArray(trackIds) ? trackIds : [trackIds];
+    await spotifyApi.addToMySavedTracks(ids);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add to liked" });
+  }
+});
+
+app.post("/api/remove-from-playlist", async (req, res) => {
+  try {
+    const { playlistId, trackUris } = req.body;
+    if (!playlistId || !trackUris) {
+      return res.status(400).json({ error: "Missing data" });
+    }
+    spotifyApi.setAccessToken(req.cookies.access_token);
+    const uris = Array.isArray(trackUris) ? trackUris : [trackUris];
+    const tracks = uris.map((uri) => ({ uri }));
+    await spotifyApi.removeTracksFromPlaylist(playlistId, tracks);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove from playlist" });
   }
 });
 
